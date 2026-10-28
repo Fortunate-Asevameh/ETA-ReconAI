@@ -3,13 +3,31 @@ ETA-ReconAI - Transaction Classification & Reconciliation prototype (Streamlit).
 Run:  streamlit run app.py
 """
 import io
+import os
 import warnings
 import pandas as pd
 import streamlit as st
 import recon_engine as E
 
 warnings.filterwarnings("ignore")
-st.set_page_config(page_title="ETA-ReconAI", page_icon="🧾", layout="wide")
+LOGO = "eta_logo.png"
+try:
+    from PIL import Image
+    _icon = Image.open("eta_logo_small.png") if os.path.exists("eta_logo_small.png") else "🧾"
+except Exception:  # noqa
+    _icon = "🧾"
+st.set_page_config(page_title="ETA-ReconAI", page_icon=_icon, layout="wide")
+SUBTITLE = "ETA Financial Technology | Prototype"
+
+
+def show_header(title):
+    """Logo + heading + subtitle line."""
+    c1, c2 = st.columns([1, 7])
+    if os.path.exists(LOGO):
+        c1.image(LOGO, width=95)
+    c2.title(title)
+    c2.caption(SUBTITLE)
+
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 ALL_CATS = sorted({c for _, c, _, _ in E.RULES} | {"Sales - Customer Transfers", "Inventory / Supplier Payments",
@@ -32,7 +50,10 @@ def read_upload(up):
 with open("sample_data.xlsx", "rb") as f:
     SAMPLE = f.read()
 
-st.sidebar.title("🧾 ETA-ReconAI")
+if os.path.exists(LOGO):
+    st.sidebar.image(LOGO, width=110)
+st.sidebar.title("ETA-ReconAI")
+st.sidebar.caption(SUBTITLE)
 st.sidebar.caption("Transaction classification & reconciliation prototype")
 source = st.sidebar.radio("Data source", ["Bundled sample data", "Upload template workbook (.xlsx)",
                                           "Upload my own bank + cash book files"])
@@ -47,7 +68,7 @@ elif source.startswith("Upload template"):
     up = st.sidebar.file_uploader("Workbook (.xlsx)", type=["xlsx"],
                                   help="Needs 'Bank Statement' and 'Cash Book' sheets in the same layout as the sample.")
     if up is None:
-        st.title("ETA-ReconAI")
+        show_header("ETA-ReconAI")
         st.info("Upload a workbook laid out like the sample, or choose another data source in the sidebar.")
         st.stop()
     try:
@@ -63,7 +84,7 @@ else:
     uk = st.sidebar.file_uploader("Cash book (optional)", type=["csv", "xlsx", "xls"], key="up_book",
                                   help="No cash book? Leave this empty: you can still classify transactions and produce the cash flow summary.")
     if ub is None:
-        st.title("ETA-ReconAI")
+        show_header("ETA-ReconAI")
         st.info("Upload a bank statement in the sidebar (a cash book is optional), then confirm the column matching.")
         st.stop()
     try:
@@ -96,7 +117,7 @@ else:
                   [("date", "Date"), ("description", "Description"), ("receipt", "Receipts (money in)"),
                    ("payment", "Payments (money out)"), ("amount", "Single signed Amount (if no receipt/payment)")]}
     if not (mb["date"] and mb["narration"]) or (mk is not None and not (mk["date"] and mk["description"])):
-        st.title("ETA-ReconAI")
+        show_header("ETA-ReconAI")
         st.warning("Choose the Date and Narration/Description columns for both files.")
         st.stop()
     try:
@@ -178,7 +199,7 @@ else:
     statement, diff = E.bank_rec_statement(bank_r, book_r, bank_r, book_r, opening)
 
 # ----------------------------------------------------------------------------- header
-st.title("ETA-ReconAI: Transaction Classification & Reconciliation")
+show_header("ETA-ReconAI: Transaction Classification & Reconciliation")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Bank transactions", f"{len(bank):,}")
 c2.metric("Cash book entries", "none" if bank_only else f"{len(book):,}")
