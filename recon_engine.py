@@ -74,7 +74,7 @@ RULES = [
     (r"VAT REMITTANCE", "VAT Remittance", 0.98, "DR"),
     (r"WHT REMITTANCE", "WHT Remittance", 0.98, "DR"),
     (r"CIT PAYMENT", "Company Income Tax", 0.98, "DR"),
-    (r"STAMP DUTY", "Stamp Duty", 0.98, "DR"),
+    (r"STAMP DUT(Y|IES)|\\bEMTL\\b|ELECTRONIC MONEY TRANSFER LEVY", "Stamp Duty", 0.98, "DR"),
     (r"UNPAID CHEQUE COMMISSION|ACCOUNT MAINTENANCE|SMS ALERT|NIP TRANSFER FEES|VAT ON BANK CHARGES|SWIFT CHARGES|SWIFT COMM|COMMISSION ON FX|FX COMMISSION|\\bCOT\\b|COMMISSION ON TURNOVER", "Bank Charges", 0.97, "DR"),
     (r"INTEREST ON CREDIT", "Interest Income", 0.97, "CR"),
     (r"RETURNED CHEQUE", "Returned Cheque (Dishonoured)", 0.80, "DR"),
@@ -146,11 +146,39 @@ def train_model(df, labels):
     return model
 
 
+
+# Categories that may only come from an explicit keyword in the narration, never from an ML guess.
+RULE_ONLY = {"Stamp Duty"}
+_GENERIC = {"DR", "CR", "NIP", "TRF", "TRANSFER", "MOB", "MOBILE", "POS", "WEB", "FT", "PAYMENT", "PAY", "TO", "FROM", "REF",
+            "REFERENCE", "NO", "NUM", "CHQ", "CHEQUE", "INWARD", "OUTWARD", "DEBIT", "CREDIT", "INV", "PMT", "TXN", "ONLINE"}
+
+
+def _known_words(model):
+    try:
+        vec = model.steps[0][1].transformer_list[0][1]
+        return {w for w in vec.vocabulary_ if " " not in w}
+    except Exception:
+        return None
+
+
+def _ml_may_decide(narration, direction, guess, known):
+    """An ML guess is only allowed when the narration has real wording the model has actually seen."""
+    if guess in RULE_ONLY:
+        return False
+    toks = [t for t in _normalise(narration, direction).split()[1:] if len(t) >= 3 and t not in _GENERIC]
+    if not toks:
+        return False                       # nothing but numbers / generic transfer words
+    if known is not None and not any(t.lower() in known for t in toks):
+        return False                       # wording never seen in training
+    return True
+
+
 def classify(bank, model=None, threshold=0.70, use_rules=True):
     """Hybrid classification. Adds category, confidence, method and needs_review."""
     out = bank.copy()
     cats, confs, methods, sugg = [], [], [], []
     ml_pred, ml_conf = (None, None)
+    known = _known_words(model) if model is not None else None
     if model is not None:
         proba = model.predict_proba(_features(out))
         ml_pred = model.classes_[proba.argmax(axis=1)]
@@ -162,8 +190,9 @@ def classify(bank, model=None, threshold=0.70, use_rules=True):
         elif model is not None:
             guess, c = ml_pred[i], float(ml_conf[i])
             # below the confidence threshold the model's guess is NOT forced into a category
-            cats.append(guess if c >= threshold else UNCLASSIFIED)
-            confs.append(c); methods.append("ML"); sugg.append(guess)
+            ok_ = c >= threshold and _ml_may_decide(row["narration"], "DR" if row["debit"] > 0 else "CR", guess, known)
+            cats.append(guess if ok_ else UNCLASSIFIED)
+            confs.append(c if ok_ else min(c, max(threshold - 0.01, 0.0))); methods.append("ML"); sugg.append(guess)
         else:
             cats.append(UNCLASSIFIED); confs.append(0.0); methods.append("None"); sugg.append("")
     out["category"] = cats
