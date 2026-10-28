@@ -1,4 +1,4 @@
-# ReconAI - Transaction Classification & Reconciliation (prototype)
+# ETA-ReconAI - Transaction Classification & Reconciliation (prototype)
 
 Academic prototype. Uploads a bank statement and a cash book, classifies every bank transaction,
 reconciles bank vs books, and produces a bank reconciliation statement and cash-flow summary.
