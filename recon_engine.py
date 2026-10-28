@@ -58,6 +58,7 @@ def _clean_book(book):
 
 
 # ----------------------------------------------------------------------------- classification
+UNCLASSIFIED = "Unclassified"   # shown when the system cannot decide; never forced into a real category
 # (regex, category, confidence, direction)  direction: 'DR', 'CR' or None
 RULES = [
     (r"REFUND CR NOTE", "Supplier Refund / Credit Note", 0.70, "CR"),
@@ -148,7 +149,7 @@ def train_model(df, labels):
 def classify(bank, model=None, threshold=0.70, use_rules=True):
     """Hybrid classification. Adds category, confidence, method and needs_review."""
     out = bank.copy()
-    cats, confs, methods = [], [], []
+    cats, confs, methods, sugg = [], [], [], []
     ml_pred, ml_conf = (None, None)
     if model is not None:
         proba = model.predict_proba(_features(out))
@@ -157,12 +158,16 @@ def classify(bank, model=None, threshold=0.70, use_rules=True):
     for i, row in out.iterrows():
         cat, conf = rule_classify(row["narration"], row["debit"], row["credit"]) if use_rules else (None, 0.0)
         if cat:
-            cats.append(cat); confs.append(conf); methods.append("Rule")
+            cats.append(cat); confs.append(conf); methods.append("Rule"); sugg.append(cat)
         elif model is not None:
-            cats.append(ml_pred[i]); confs.append(float(ml_conf[i])); methods.append("ML")
+            guess, c = ml_pred[i], float(ml_conf[i])
+            # below the confidence threshold the model's guess is NOT forced into a category
+            cats.append(guess if c >= threshold else UNCLASSIFIED)
+            confs.append(c); methods.append("ML"); sugg.append(guess)
         else:
-            cats.append("Unidentified - Suspense"); confs.append(0.0); methods.append("None")
+            cats.append(UNCLASSIFIED); confs.append(0.0); methods.append("None"); sugg.append("")
     out["category"] = cats
+    out["suggested_category"] = sugg
     out["confidence"] = np.round(confs, 3)
     out["method"] = methods
     out["needs_review"] = out["confidence"] < threshold
@@ -298,7 +303,8 @@ CLASS_OF = {}
 _INV = {"Equipment & Vehicle Purchases", "Asset Disposal Proceeds"}
 _FIN = {"Loan Proceeds", "Loan Repayment - Principal + Interest", "Loan Facility Fees", "Owner Capital Injection",
         "Director Loan Received", "Director Loan Repaid", "Owner Drawings"}
-_OTH = {"Transfer Between Own Accounts", "Bank Reversal / Error", "Unidentified - Suspense"}
+UNCLASSIFIED = "Unclassified"
+_OTH = {"Transfer Between Own Accounts", "Bank Reversal / Error", "Unidentified - Suspense", UNCLASSIFIED}
 
 
 def fs_class(cat):
