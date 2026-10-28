@@ -13,7 +13,7 @@ st.set_page_config(page_title="ReconAI", page_icon="🧾", layout="wide")
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 ALL_CATS = sorted({c for _, c, _, _ in E.RULES} | {"Sales - Customer Transfers", "Inventory / Supplier Payments",
-                                                  "Salaries & Wages", "Bank Charges", "Interest Income", "Unidentified - Suspense"})
+                                                  "Salaries & Wages", "Bank Charges", "Interest Income", "Unidentified - Suspense", E.UNCLASSIFIED})
 money = lambda x: f"₦{x:,.2f}"
 
 
@@ -208,7 +208,7 @@ with t2:
     if sel_cat: v = v[v["category"].isin(sel_cat)]
     if sel_m: v = v[v["method"].isin(sel_m)]
     if only_low: v = v[v["needs_review"]]
-    st.dataframe(v[["sn", "date", "narration", "debit", "credit", "category", "confidence", "method", "needs_review"]],
+    st.dataframe(v[["sn", "date", "narration", "debit", "credit", "category", "suggested_category", "confidence", "method", "needs_review"]],
                  use_container_width=True, height=450)
     st.caption("Rule = keyword match; ML = TF-IDF + Logistic Regression prediction; Human = your correction.")
     mc = classified["method"].value_counts()
@@ -216,22 +216,24 @@ with t2:
 
 # ----------------------------------------------------------------------------- tab 3
 with t3:
-    st.subheader("Review queue (low-confidence classifications)")
-    q = classified[classified["needs_review"]][["sn", "date", "narration", "debit", "credit", "category", "confidence", "method"]].copy()
+    st.subheader("Review queue (items the system could not classify with confidence)")
+    q = classified[classified["needs_review"]][["sn", "date", "narration", "debit", "credit", "category", "suggested_category", "confidence", "method"]].copy()
     st.write(f"{len(q)} transactions need a decision. Pick the correct category, then click **Apply corrections**.")
     if len(q):
         edited = st.data_editor(
             q, use_container_width=True, height=450, hide_index=True, key="review_editor",
-            disabled=["sn", "date", "narration", "debit", "credit", "confidence", "method"],
+            disabled=["sn", "date", "narration", "debit", "credit", "suggested_category", "confidence", "method"],
             column_config={"category": st.column_config.SelectboxColumn("category", options=ALL_CATS, required=True)})
         b1, b2 = st.columns(2)
         if b1.button("Apply corrections"):
             changed = edited.merge(q[["sn", "category"]], on="sn", suffixes=("", "_old"))
+            changed = changed[changed["category"] != changed["category_old"]]
             for _, r in changed.iterrows():
                 st.session_state.corrections[int(r["sn"])] = r["category"]
             st.rerun()
         if b2.button("Apply + retrain model on corrections"):
             changed = edited.merge(q[["sn", "category"]], on="sn", suffixes=("", "_old"))
+            changed = changed[changed["category"] != changed["category_old"]]
             for _, r in changed.iterrows():
                 st.session_state.corrections[int(r["sn"])] = r["category"]
             st.session_state.extra_train = True
@@ -281,9 +283,9 @@ with t5:
     st.subheader("Cash flow statement (from classified transactions)")
     cf = E.cash_flow_statement(classified, opening)
     st.dataframe(cf.assign(**{"Amount (NGN)": cf["Amount (NGN)"].map(lambda x: f"{x:,.2f}")}), use_container_width=True, hide_index=True)
-    unresolved = classified[classified["category"] == "Unidentified - Suspense"]["net"].sum()
+    unresolved = classified[classified["category"].isin(["Unidentified - Suspense", E.UNCLASSIFIED])]["net"].sum()
     if abs(unresolved) > 0:
-        st.warning(f"{money(unresolved)} is sitting in suspense. Resolve it before finalising the statements.")
+        st.warning(f"{money(unresolved)} is unclassified or in suspense. Resolve it before finalising the statements.")
     st.subheader("Monthly summary by category")
     piv = E.monthly_summary(classified)
     piv.columns = [MONTHS[c - 1] if isinstance(c, (int, float)) else c for c in piv.columns]
