@@ -18,6 +18,8 @@ except Exception:  # noqa
     _icon = "🧾"
 st.set_page_config(page_title="ETA-ReconAI", page_icon=_icon, layout="wide")
 SUBTITLE = "ETA Financial Technology | Prototype"
+# Demo/sample data is hidden by default. Set to True only if you want the "Bundled sample data" options to appear.
+SHOW_DEMO = False
 
 
 def show_header(title):
@@ -48,7 +50,7 @@ def read_upload(up):
 
 
 SAMPLE = b""
-if os.path.exists("sample_data.xlsx"):
+if SHOW_DEMO and os.path.exists("sample_data.xlsx"):
     with open("sample_data.xlsx", "rb") as f:
         SAMPLE = f.read()
 
@@ -57,8 +59,10 @@ if os.path.exists(LOGO):
 st.sidebar.title("ETA-ReconAI")
 st.sidebar.caption(SUBTITLE)
 st.sidebar.caption("Transaction classification & reconciliation prototype")
-source = st.sidebar.radio("Data source", ["Upload my own bank + cash book files", "Upload template workbook (.xlsx)",
-                                          "Bundled sample data (demo)"], index=0)
+SOURCES = ["Upload my own bank + cash book files", "Upload template workbook (.xlsx)"]
+if SHOW_DEMO:
+    SOURCES.append("Bundled sample data (demo)")
+source = st.sidebar.radio("Data source", SOURCES, index=0)
 key = None
 bank_only = False
 if source.startswith("Bundled"):  # demo data is only used when the user chooses it
@@ -88,7 +92,7 @@ else:
     if ub is None:
         show_header("ETA-ReconAI")
         st.info("Upload a bank statement in the sidebar (a cash book is optional), then confirm the column matching. "
-                "To try the demo instead, choose \"Bundled sample data (demo)\" under Data source.")
+                "Nothing is loaded until you upload your own file.")
         st.stop()
     try:
         rb = read_upload(ub)
@@ -143,11 +147,13 @@ use_rules = st.sidebar.checkbox("Layer 1: keyword rules", value=True)
 OPT_SAMPLE = "Bundled sample data"
 OPT_SELF = "This statement only (self-training)"
 OPT_OFF = "Off (rules only)"
+ML_OPTIONS = [OPT_SAMPLE, OPT_SELF, OPT_OFF] if SHOW_DEMO else [OPT_SELF, OPT_OFF]
+ml_default = OPT_SELF if (source.startswith("Upload my own") or not SHOW_DEMO) else OPT_SAMPLE
 ml_source = st.sidebar.radio(
-    "Layer 2: what should the ML layer learn from?", [OPT_SAMPLE, OPT_SELF, OPT_OFF],
-    index=1 if source.startswith("Upload my own") else 0, key=f"ml_{source}",
+    "Layer 2: what should the ML layer learn from?", ML_OPTIONS,
+    index=ML_OPTIONS.index(ml_default), key=f"ml_{source}",
     help="Self-training learns only from this statement's own narrations: transactions the rules recognise confidently "
-         "(plus your corrections) teach the model how to classify the remaining ones. Nothing from the sample data is used.")
+         "(plus your corrections) teach the model how to classify the remaining ones. No other data is used.")
 threshold = st.sidebar.slider("Review threshold (confidence below this goes to review)", 0.30, 0.95, 0.70, 0.05)
 use_split = (key is not None) and ml_source == OPT_SAMPLE
 if use_split:
