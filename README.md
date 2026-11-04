@@ -56,6 +56,8 @@ to many book entries; leftovers (bank only, deposit in transit, outstanding cheq
 
 ## Using your own data
 
+The bundled sample data is hidden by default, so the app opens empty and waits for your upload. To show the demo options again, set `SHOW_DEMO = True` near the top of `app.py`.
+
 In the sidebar choose **Data source**:
 1. *Bundled sample data*.
 2. *Upload template workbook* - an .xlsx laid out like `sample_data.xlsx`.
@@ -88,4 +90,3 @@ Unclassified items count as not correct, so these figures are lower than a force
 - Ambiguous items (capital vs loan, drawings vs expense) need business context: that is what the review queue is for.
 - Review corrections last only for the current session.
 - Single account, single currency, single financial year per run.
-
