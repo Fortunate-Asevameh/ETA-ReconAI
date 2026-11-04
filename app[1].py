@@ -47,19 +47,21 @@ def read_upload(up):
     return E.read_table(buf, up.name)
 
 
-with open("sample_data.xlsx", "rb") as f:
-    SAMPLE = f.read()
+SAMPLE = b""
+if os.path.exists("sample_data.xlsx"):
+    with open("sample_data.xlsx", "rb") as f:
+        SAMPLE = f.read()
 
 if os.path.exists(LOGO):
     st.sidebar.image(LOGO, width=110)
 st.sidebar.title("ETA-ReconAI")
 st.sidebar.caption(SUBTITLE)
 st.sidebar.caption("Transaction classification & reconciliation prototype")
-source = st.sidebar.radio("Data source", ["Bundled sample data", "Upload template workbook (.xlsx)",
-                                          "Upload my own bank + cash book files"])
+source = st.sidebar.radio("Data source", ["Upload my own bank + cash book files", "Upload template workbook (.xlsx)",
+                                          "Bundled sample data (demo)"], index=0)
 key = None
 bank_only = False
-if source.startswith("Bundled"):
+if source.startswith("Bundled"):  # demo data is only used when the user chooses it
     bank, book, key = load(SAMPLE)
     opening = E.opening_balance(bank)
     st.sidebar.info("Using the bundled sample data (fictional company, FY2025).")
@@ -85,7 +87,8 @@ else:
                                   help="No cash book? Leave this empty: you can still classify transactions and produce the cash flow summary.")
     if ub is None:
         show_header("ETA-ReconAI")
-        st.info("Upload a bank statement in the sidebar (a cash book is optional), then confirm the column matching.")
+        st.info("Upload a bank statement in the sidebar (a cash book is optional), then confirm the column matching. "
+                "To try the demo instead, choose \"Bundled sample data (demo)\" under Data source.")
         st.stop()
     try:
         rb = read_upload(ub)
