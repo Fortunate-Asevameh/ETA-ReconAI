@@ -13,8 +13,15 @@ and produces a bank reconciliation statement and a cash-flow summary. All bundle
 | `recon_engine.py` | All logic: import, classification, reconciliation, summaries, evaluation |
 | `sample_data.xlsx` | Fictional FY2025 dataset (bank statement, cash book, answer key) |
 | `requirements.txt` | Python libraries to install |
-| `eta_logo.png`, `eta_logo_small.png`, `eta_logo.svg` | ETA logo (app header, sidebar, browser tab) |
+| `.streamlit/config.toml` | Navy and gold colour theme (page, sidebar, buttons). Must be in a folder named `.streamlit` |
+| `eta_logo.png`, `eta_logo_small.png`, `eta_logo.svg` | ETA logo files for documents and slides. The app itself has the logo embedded in `app.py`, so it does not need these |
 | `README.md` | This file |
+
+## Colour theme
+
+The app uses the logo colours (navy `#1F3864`, gold `#C9A227`) through `.streamlit/config.toml`. On GitHub, add it with
+Add file > Create new file, type `.streamlit/config.toml` as the name (the slash creates the folder), paste the contents, and commit.
+A lighter alternative theme is included as comments in the same file.
 
 ## Run it on your computer
 
